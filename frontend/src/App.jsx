@@ -95,9 +95,7 @@ function App() {
           </div>
         </div>
 
-        <div className="p-4 border-t border-gray-700">
-           <div className="text-xs text-gray-500">D. E. Shaw & Co. Style Simulation</div>
-        </div>
+        
       </div>
 
       {/* --- MAIN CHAT AREA --- */}
@@ -175,9 +173,6 @@ function App() {
             >
               <SendIcon />
             </button>
-          </div>
-          <div className="text-center mt-2">
-            <p className="text-[10px] text-gray-600">CONFIDENTIAL // INTERNAL USE ONLY</p>
           </div>
         </div>
       </div>
