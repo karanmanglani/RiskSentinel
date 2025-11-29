@@ -3,12 +3,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
 
-# # --- CONFIGURATION ---
-# current_file_path = Path(__file__).resolve()
-# project_root = current_file_path.parent.parent.parent
-# env_path = project_root / ".env"
-# load_dotenv(dotenv_path=env_path)
-
 load_dotenv()
 
 api_token = os.getenv("HUGGINGFACEHUB_API_TOKEN")
