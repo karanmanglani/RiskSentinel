@@ -3,3 +3,4 @@
 /backend/__pycache__/*
 /backend/app/services/__pycache__/*
 /venv/*
+/backend/chroma_db/*
