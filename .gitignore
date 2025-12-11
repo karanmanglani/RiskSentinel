@@ -4,3 +4,4 @@
 /backend/app/services/__pycache__/*
 /venv/*
 /backend/chroma_db/*
+/backend/tests/__pycache__/*
