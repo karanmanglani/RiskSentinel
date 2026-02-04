@@ -4,6 +4,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from datetime import timedelta
+from typing import List
 
 # Import our infrastructure
 from app.database import engine, get_db
@@ -35,6 +36,13 @@ class Token(BaseModel):
 
 class RiskQuery(BaseModel):
     question: str
+
+class MessageHistory(BaseModel):
+    role: str
+    content: str
+    
+    class Config:
+        orm_mode = True
 
 # --- AUTH ENDPOINTS ---
 
@@ -86,20 +94,36 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
 def health_check():
     return {"status": "active", "service": "RiskSentinel Brain"}
 
+@app.get("/api/history", response_model=List[MessageHistory])
+def get_chat_history(current_user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
+    # SQL: SELECT * FROM messages WHERE user_id = {current_user.id} ORDER BY timestamp ASC
+    messages = db.query(models.Message)\
+        .filter(models.Message.user_id == current_user.id)\
+        .order_by(models.Message.timestamp.asc())\
+        .all()
+    return messages
+
 @app.post("/api/analyze")
 def analyze_risk(
     query: RiskQuery, 
-    # 🔒 THE LOCK: This line forces the user to be logged in
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db) # <--- Need DB access here now
 ):
-    print(f"User {current_user.email} is asking: {query.question}")
-    
-    if not query.question:
-        raise HTTPException(status_code=400, detail="Question cannot be empty")
-    
+    # 1. Save User Message
+    user_msg = models.Message(user_id=current_user.id, role="user", content=query.question)
+    db.add(user_msg)
+    db.commit() # Commit immediately so it's safe
+
     try:
-        answer = query_rag(query.question)
-        return {"answer": answer}
+        # 2. Get AI Response
+        ai_response_text = query_rag(query.question)
+        
+        # 3. Save AI Message
+        ai_msg = models.Message(user_id=current_user.id, role="assistant", content=ai_response_text)
+        db.add(ai_msg)
+        db.commit()
+        
+        return {"answer": ai_response_text}
     except Exception as e:
         print(f"❌ Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

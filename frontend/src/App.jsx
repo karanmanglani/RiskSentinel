@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import ReactMarkdown from "react-markdown";
-import Login from "./Login"; // <-- Import Login Page
-import { AuthProvider, useAuth } from "./AuthContext"; // <-- Import Auth Context
+import Login from "./Login";
+import { AuthProvider, useAuth } from "./AuthContext";
 
 // --- ICONS (Keep your existing icons here) ---
 const SendIcon = () => (
@@ -74,6 +74,39 @@ function Dashboard() {
     { role: "system", content: "RiskSentinel Active. Identity Verified." },
   ]);
   const [loading, setLoading] = useState(false);
+
+  // Memory Hook
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const res = await axios.get("http://127.0.0.1:8000/api/history", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        // If we have history, show it.
+        // If not, show the default welcome message.
+        if (res.data.length > 0) {
+          setMessages(res.data);
+        } else {
+          setMessages([
+            {
+              role: "system",
+              content:
+                "RiskSentinel Active. Identity Verified. No previous records found.",
+            },
+          ]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch history:", error);
+        // If 401, token is invalid -> logout
+        if (error.response && error.response.status === 401) {
+          logout();
+        }
+      }
+    };
+
+    fetchHistory();
+  }, [token]); // Run this whenever 'token' changes (effectively once on login)
 
   const handleSend = async () => {
     if (!input.trim()) return;
