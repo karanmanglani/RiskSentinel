@@ -9,6 +9,7 @@ from app.database import get_db
 from app.models import User
 import os
 from dotenv import load_dotenv
+import hashlib
 
 load_dotenv()
 
@@ -17,22 +18,31 @@ SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key-change-this")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# --- Helpers ---
+# we hash the password with SHA256 first.
+def _pre_hash(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
 
 # --- UTILS ---
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    # Hash the input first, THEN check against the stored Bcrypt hash
+    pre_hashed = _pre_hash(plain_password)
+    return pwd_context.verify(pre_hashed, hashed_password)
 
 def get_password_hash(password):
-    return pwd_context.hash(password)
+    # Hash the input first, THEN generate the Bcrypt hash
+    pre_hashed = _pre_hash(password)
+    return pwd_context.hash(pre_hashed)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.now(datetime.timezone.utc) + expires_delta
+        expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.now(datetime.timezone.utc) + timedelta(minutes=15)
+        expire = datetime.utcnow() + timedelta(minutes=15)
     
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
