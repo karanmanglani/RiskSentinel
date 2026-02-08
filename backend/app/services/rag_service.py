@@ -8,7 +8,7 @@ from sec_edgar_downloader import Downloader
 from langchain_community.document_loaders import BSHTMLLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 
 # --- PATH FIX (CRITICAL) ---
 # This ensures Python knows where 'backend' is
@@ -25,7 +25,13 @@ load_dotenv(dotenv_path=env_path)
 
 # -- Setup Vector DB (Chroma) ---
 PERSIST_DIRECTORY = "./chroma_db"
-EMBEDDING_MODEL = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+repo_id = "sentence-transformers/all-MiniLM-L6-v2"
+
+EMBEDDING_MODEL = HuggingFaceEndpointEmbeddings(
+    model=repo_id,
+    task="feature-extraction",
+    huggingfacehub_api_token=os.getenv("HUGGINGFACEHUB_API_TOKEN")
+)
 
 vector_db = Chroma(
     persist_directory=PERSIST_DIRECTORY,
