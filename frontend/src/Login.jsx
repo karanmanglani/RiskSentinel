@@ -19,10 +19,10 @@ export default function Login() {
         const formData = new FormData();
         formData.append("username", email);
         formData.append("password", password);
-        const res = await axios.post("http://127.0.0.1:8000/token", formData);
+        const res = await axios.post("/token", formData);
         login(res.data.access_token);
       } else {
-        const res = await axios.post("http://127.0.0.1:8000/register", {
+        const res = await axios.post("/register", {
           email: email,
           password: password,
         });
@@ -40,7 +40,7 @@ export default function Login() {
       const googleToken = credentialResponse.credential;
 
       // 2. Send it to OUR Backend
-      const res = await axios.post("http://127.0.0.1:8000/auth/google", {
+      const res = await axios.post("/auth/google", {
         token: googleToken,
       });
 

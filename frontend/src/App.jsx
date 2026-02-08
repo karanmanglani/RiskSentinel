@@ -114,7 +114,7 @@ function Dashboard() {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const res = await axios.get("http://127.0.0.1:8000/api/history", {
+        const res = await axios.get("/api/history", {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.data.length > 0) setMessages(res.data);
@@ -142,7 +142,7 @@ function Dashboard() {
 
     try {
       const response = await axios.post(
-        "http://127.0.0.1:8000/api/analyze",
+        "/api/analyze",
         { question: userMessage.content },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -168,7 +168,7 @@ function Dashboard() {
     try {
       // Call our new Endpoint
       await axios.post(
-        "http://127.0.0.1:8000/api/ingest",
+        "/api/ingest",
         { ticker: ticker },
         { headers: { Authorization: `Bearer ${token}` } },
       );
