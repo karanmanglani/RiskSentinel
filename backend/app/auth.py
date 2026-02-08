@@ -10,6 +10,8 @@ from app.models import User
 import os
 from dotenv import load_dotenv
 import hashlib
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 
 load_dotenv()
 
@@ -17,6 +19,7 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key-change-this")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
+GOOGLE_CLIENT_ID = "326829570192-gf6boa8bms63jcg4atn3iapdcqjapmdu.apps.googleusercontent.com"
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -67,3 +70,18 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     if user is None:
         raise credentials_exception
     return user
+
+def verify_google_token(token: str):
+    try:
+        # Verify the token with Google's public keys
+        id_info = id_token.verify_oauth2_token(
+            token, 
+            google_requests.Request(), 
+            GOOGLE_CLIENT_ID
+        )
+        
+        # Google returns the user's email inside the token
+        return id_info['email']
+    except Exception as e:
+        print(f"Google Auth Error: {e}")
+        return None

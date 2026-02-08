@@ -47,6 +47,9 @@ class MessageHistory(BaseModel):
 class TickerRequest(BaseModel):
     ticker: str
 
+class GoogleAuthRequest(BaseModel):
+    token: str
+
 # --- AUTH ENDPOINTS ---
 
 @app.post("/register", response_model=Token)
@@ -88,8 +91,32 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
     access_token = auth.create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
 
-# --- GOOGLE OAUTH PLACEHOLDER (We will add logic here next) ---
-# For now, we focus on getting Standard Auth working first.
+@app.post("/auth/google", response_model=Token)
+def google_login(request: GoogleAuthRequest, db: Session = Depends(get_db)):
+    # A. Verify Token with Google
+    email = auth.verify_google_token(request.token)
+    if not email:
+        raise HTTPException(status_code=400, detail="Invalid Google Token")
+    
+    # B. Check if User Exists
+    user = db.query(models.User).filter(models.User.email == email).first()
+    
+    if not user:
+        # C. If New User -> Create Account Automatically
+        # Note: We set hashed_password to None (since they use Google)
+        new_user = models.User(
+            email=email, 
+            hashed_password=None, 
+            provider="google" # <--- Tag them!
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        user = new_user
+
+    # D. Issue OUR Token
+    access_token = auth.create_access_token(data={"sub": user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 # --- PROTECTED APP ENDPOINTS ---
 
