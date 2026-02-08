@@ -1,10 +1,13 @@
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from typing import List
+import os
 
 # Import our infrastructure
 from app.database import engine, get_db
@@ -120,10 +123,6 @@ def google_login(request: GoogleAuthRequest, db: Session = Depends(get_db)):
 
 # --- PROTECTED APP ENDPOINTS ---
 
-@app.get("/")
-def health_check():
-    return {"status": "active", "service": "RiskSentinel Brain"}
-
 @app.get("/api/history", response_model=List[MessageHistory])
 def get_chat_history(current_user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
     # SQL: SELECT * FROM messages WHERE user_id = {current_user.id} ORDER BY timestamp ASC
@@ -172,3 +171,28 @@ def ingest_ticker(
     except Exception as e:
         print(f"❌ Error ingesting {ticker}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+if os.path.exists("app/static"):
+    build_dir = "app/static"
+else:
+    build_dir = "../frontend/dist" # Local fallback
+
+if os.path.exists(build_dir):
+    app.mount("/assets", StaticFiles(directory=f"{build_dir}/assets"), name="assets")
+
+    # 1. SERVE ROOT (Home Page)
+    @app.get("/")
+    async def serve_spa_root():
+        return FileResponse(f"{build_dir}/index.html")
+
+    # 2. CATCH-ALL (For React Router paths like /dashboard, /login)
+    @app.get("/{full_path:path}")
+    async def serve_spa_catchall(full_path: str):
+        # If it tries to hit an API that doesn't exist, return 404 (don't serve HTML)
+        if full_path.startswith("api") or full_path.startswith("auth"):
+            raise HTTPException(status_code=404, detail="API Endpoint not found")
+
+        # Otherwise, serve the App
+        return FileResponse(f"{build_dir}/index.html")
+else:
+    print("⚠️ React Build not found. Running in API-Only mode.")
