@@ -3,7 +3,7 @@ from pathlib import Path
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 
 # --- CONFIGURATION ---
 current_file = Path(__file__).resolve()
@@ -13,7 +13,13 @@ vector_db_path = project_root / "chroma_db" # Where we save the DB
 
 # Define the Embedding Model (Converts text -> numbers)
 # We use a small, fast model explicitly for this
-embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+repo_id = "sentence-transformers/all-MiniLM-L6-v2"
+
+embedding_model = HuggingFaceEndpointEmbeddings(
+    model=repo_id,
+    task="feature-extraction",
+    huggingfacehub_api_token=os.getenv("HUGGINGFACEHUB_API_TOKEN")
+)
 
 def build_vector_db():
     pdf_path = data_folder / "apple_10k.pdf"
