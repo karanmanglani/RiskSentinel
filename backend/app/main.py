@@ -9,7 +9,7 @@ from typing import List
 # Import our infrastructure
 from app.database import engine, get_db
 from app import models, auth
-from app.services.rag_service import query_rag
+from app.services.rag_service import query_rag,download_and_ingest_10k
 
 # 1. CREATE TABLES IN CLOUD DB (Run migrations)
 models.Base.metadata.create_all(bind=engine)
@@ -43,6 +43,9 @@ class MessageHistory(BaseModel):
     
     class Config:
         orm_mode = True
+
+class TickerRequest(BaseModel):
+    ticker: str
 
 # --- AUTH ENDPOINTS ---
 
@@ -126,4 +129,19 @@ def analyze_risk(
         return {"answer": ai_response_text}
     except Exception as e:
         print(f"❌ Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/api/ingest")
+def ingest_ticker(
+    request: TickerRequest,
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    ticker = request.ticker.upper()
+    print(f"User {current_user.email} requested 10-K for {ticker}")
+
+    try:
+        num_chunks = download_and_ingest_10k(ticker)
+        return {"status": "success", "ticker": ticker, "chunks_added": num_chunks}
+    except Exception as e:
+        print(f"❌ Error ingesting {ticker}: {e}")
         raise HTTPException(status_code=500, detail=str(e))

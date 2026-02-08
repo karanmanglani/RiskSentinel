@@ -1,8 +1,14 @@
 import sys
-import os
 from pathlib import Path
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
+import os
+import glob
+from sec_edgar_downloader import Downloader
+from langchain_community.document_loaders import BSHTMLLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
 
 # --- PATH FIX (CRITICAL) ---
 # This ensures Python knows where 'backend' is
@@ -17,7 +23,67 @@ from app.services.vector_store import get_retriever
 env_path = project_root / ".env"
 load_dotenv(dotenv_path=env_path)
 
+# -- Setup Vector DB (Chroma) ---
+PERSIST_DIRECTORY = "./chroma_db"
+EMBEDDING_MODEL = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+vector_db = Chroma(
+    persist_directory=PERSIST_DIRECTORY,
+    embedding_function=EMBEDDING_MODEL
+)
+
 # --- THE RAG ENGINE ---
+
+def download_and_ingest_10k(ticker: str):
+    """
+    Downloads the latest 10-K for a ticker and ingests it.
+    """
+    print(f"🚀 Starting SEC Download for: {ticker}")
+    
+    # 1. Setup Downloader (Requires an email for User-Agent compliance)
+    dl = Downloader("RiskSentinel", "admin@risksentinel.com")
+    
+    # 2. Download latest 10-K
+    # This saves to: ./sec-edgar-filings/{ticker}/10-K/...
+    try:
+        dl.get("10-K", ticker, limit=1)
+    except Exception as e:
+        raise ValueError(f"Failed to download 10-K for {ticker}: {e}")
+
+    # 3. Find the file (It's deeply nested)
+    # We look for the .html or .txt file in the download folder
+    search_path = f"sec-edgar-filings/{ticker}/10-K/**/*.txt" # Modern filings are often .txt (HTML inside)
+    files = glob.glob(search_path, recursive=True)
+    
+    if not files:
+        # Fallback for some companies that use .html
+        search_path = f"sec-edgar-filings/{ticker}/10-K/**/*.html"
+        files = glob.glob(search_path, recursive=True)
+        
+    if not files:
+        raise FileNotFoundError(f"No 10-K file found for {ticker}")
+        
+    target_file = files[0]
+    print(f"📂 Found filing: {target_file}")
+    
+    # 4. Load and Clean (HTML -> Text)
+    # We use BSHTMLLoader because SEC filings are HTML
+    loader = BSHTMLLoader(target_file)
+    docs = loader.load()
+    
+    # 5. Split and Vectorize
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=2000, # 10-Ks are dense, so larger chunks
+        chunk_overlap=200
+    )
+    splits = text_splitter.split_documents(docs)
+    
+    # 6. Store in DB
+    vector_db.add_documents(documents=splits)
+    print(f"✅ Ingested {len(splits)} chunks for {ticker}")
+    
+    return len(splits)
+
 def query_rag(user_question: str):
     print(f"🔎 Analyzing PDF for: '{user_question}'")
     
